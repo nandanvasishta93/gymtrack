@@ -1,0 +1,276 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String            @id @default(uuid())
+  email             String            @unique
+  password          String
+  name              String            @default("Athlete")
+  age               Int               @default(23)
+  weight            Float             @default(62.0)
+  height            Float             @default(168.0)
+  experience        String            @default("Intermediate")
+  goal              String            @default("Build muscle and gradually reduce body fat")
+  trainingFrequency Int               @default(6)
+  workoutDuration   String            @default("60-90 minutes")
+  diet              String            @default("Vegetarian")
+  gymEquipment      String            @default("Full commercial gym")
+  programDuration   Int               @default(90)
+  restDay           String            @default("Sunday")
+  startDate         String            // YYYY-MM-DD
+  units             String            @default("kg/cm") // "kg/cm" or "lb/in"
+  theme             String            @default("dark")
+  avoidDuplicateCore Boolean          @default(true)
+  dailyProteinTarget Float            @default(115.0) // 100-125g target
+  dailyWaterTarget  Float             @default(3000.0) // ml
+  cardioTargetMins  Int               @default(120) // weekly minutes
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  sessions          WorkoutSession[]
+  coreSessions      CoreSession[]
+  cardioSessions    CardioSession[]
+  measurements      BodyMeasurement[]
+  nutritionEntries  NutritionEntry[]
+  waterLogs         WaterLog[]
+  personalRecords   PersonalRecord[]
+  programDays       ProgramDay[]
+}
+
+model Exercise {
+  id               String   @id @default(uuid())
+  name             String   @unique
+  photoUrl         String?
+  videoUrl         String?
+  primaryMuscle    String
+  secondaryMuscles String   @default("[]") // JSON string of muscles
+  equipment        String
+  category         String   // Chest, Back, Shoulders, Biceps, Triceps, Forearms, Quadriceps, Hamstrings, Glutes, Calves, Abs, Obliques, Lower back, Cardio, Mobility
+  difficulty       String   // Beginner, Intermediate, Advanced
+  instructions     String
+  formCues         String   @default("[]") // JSON string array
+  commonMistakes   String   @default("[]") // JSON string array
+  safetyNotes      String?
+  setsRepsTarget   String   // e.g. "3 x 8-12"
+  restSeconds      Int      @default(90)
+  variations       String   @default("[]") // JSON string array
+  substitutions    String   @default("[]") // JSON string array
+  createdAt        DateTime @default(now())
+
+  templateItems    WorkoutTemplateExercise[]
+  setLogs          SetLog[]
+  personalRecords  PersonalRecord[]
+}
+
+model WorkoutTemplate {
+  id          String   @id @default(uuid())
+  name        String   @unique // "Push A", "Pull A", "Legs A", "Push B", "Pull B", "Legs B", "Core A", "Core B", "Core C"
+  dayOfWeek   String   // "Monday", "Tuesday", etc.
+  type        String   @default("STRENGTH") // "STRENGTH" or "CORE"
+  description String
+  createdAt   DateTime @default(now())
+
+  exercises   WorkoutTemplateExercise[]
+  programDays ProgramDay[]
+  sessions    WorkoutSession[]
+}
+
+model WorkoutTemplateExercise {
+  id          String   @id @default(uuid())
+  templateId  String
+  exerciseId  String
+  orderIndex  Int
+  targetSets  Int      @default(3)
+  targetReps  String   @default("8-12") // e.g. "6-8" or "8-12"
+  restSeconds Int      @default(90)
+  targetRir   Int      @default(2) // Reps in Reserve
+  notes       String?
+
+  template    WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exercise    Exercise        @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+}
+
+model ProgramDay {
+  id              String   @id @default(uuid())
+  userId          String
+  dayNumber       Int      // 1 to 90
+  date            String   // YYYY-MM-DD
+  weekNumber      Int      // 1 to 13
+  phaseName       String   // e.g. "Phase 1: Baseline"
+  status          String   @default("NOT_STARTED") // "NOT_STARTED", "IN_PROGRESS", "COMPLETED", "REST_DAY", "MISSED"
+  workoutTemplateId String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutTemplate WorkoutTemplate? @relation(fields: [workoutTemplateId], references: [id])
+  session         WorkoutSession?
+  coreSession     CoreSession?
+
+  @@unique([userId, dayNumber])
+  @@unique([userId, date])
+}
+
+model WorkoutSession {
+  id              String    @id @default(uuid())
+  userId          String
+  programDayId    String    @unique
+  templateId      String?
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  durationSeconds Int       @default(0)
+  status          String    @default("IN_PROGRESS") // "IN_PROGRESS", "COMPLETED", "ABANDONED"
+  totalVolumeKg   Float     @default(0)
+  totalReps       Int       @default(0)
+  notes           String?
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programDay      ProgramDay      @relation(fields: [programDayId], references: [id], onDelete: Cascade)
+  template        WorkoutTemplate? @relation(fields: [templateId], references: [id])
+  setLogs         SetLog[]
+  exerciseCompletions ExerciseCompletion[]
+}
+
+model SetLog {
+  id             String    @id @default(uuid())
+  sessionId      String
+  exerciseId     String
+  setNumber      Int
+  targetWeightKg Float     @default(0)
+  actualWeightKg Float     @default(0)
+  targetReps     Int       @default(10)
+  actualReps     Int       @default(0)
+  rir            Int       @default(2) // Reps in reserve
+  completed      Boolean   @default(false)
+  isPr           Boolean   @default(false)
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  session        WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise       Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+}
+
+model ExerciseCompletion {
+  id          String   @id @default(uuid())
+  sessionId   String
+  exerciseId  String
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+
+  session     WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model CoreSession {
+  id              String    @id @default(uuid())
+  userId          String
+  programDayId    String?   @unique
+  routineName     String    // "Core A", "Core B", "Core C", "Recovery"
+  date            String    // YYYY-MM-DD
+  completed       Boolean   @default(false)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationSeconds Int       @default(0)
+  plankSeconds    Int       @default(0)
+  totalReps       Int       @default(0)
+  notes           String?
+
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programDay      ProgramDay? @relation(fields: [programDayId], references: [id], onDelete: SetNull)
+  setLogs         CoreSetLog[]
+}
+
+model CoreSetLog {
+  id            String      @id @default(uuid())
+  coreSessionId String
+  exerciseName  String
+  setNumber     Int
+  targetReps    String      // e.g. "12-15" or "30-45s"
+  actualReps    Int         @default(0)
+  durationSecs  Int         @default(0)
+  completed     Boolean     @default(false)
+
+  coreSession   CoreSession @relation(fields: [coreSessionId], references: [id], onDelete: Cascade)
+}
+
+model CardioSession {
+  id              String   @id @default(uuid())
+  userId          String
+  activity        String   // "Treadmill walking", "Incline walking", "Running", "Cycling", "Elliptical", "Rowing machine", "Stair climber", "Other"
+  date            String   // YYYY-MM-DD
+  durationMinutes Int
+  distanceKm      Float?
+  inclinePercent  Float?
+  speedKmh        Float?
+  intensity       String   // "Low", "Moderate", "High", "HIIT"
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BodyMeasurement {
+  id              String   @id @default(uuid())
+  userId          String
+  date            String   // YYYY-MM-DD
+  weightKg        Float
+  waistCm         Float?
+  chestCm         Float?
+  armCm           Float?
+  thighCm         Float?
+  hipCm           Float?
+  bodyFatPercent  Float?   // Optional device measurement
+  notes           String?
+  photoUrl        String?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NutritionEntry {
+  id          String   @id @default(uuid())
+  userId      String
+  date        String   // YYYY-MM-DD
+  mealType    String   // "Breakfast", "Lunch", "Snack", "Dinner", "Pre-workout", "Post-workout"
+  foodItem    String
+  quantity    String   // e.g. "100g", "2 pieces", "1 bowl"
+  calories    Float?
+  proteinG    Float    @default(0)
+  carbsG      Float    @default(0)
+  fatG        Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WaterLog {
+  id          String   @id @default(uuid())
+  userId      String
+  date        String   // YYYY-MM-DD
+  glasses     Int      @default(0) // 250ml per glass
+  amountMl    Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model PersonalRecord {
+  id            String   @id @default(uuid())
+  userId        String
+  exerciseId    String
+  weightKg      Float
+  reps          Int
+  estimated1Rm  Float
+  achievedAt    DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise      Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+}

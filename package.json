@@ -1,0 +1,17 @@
+{
+  "name": "gym-mine-tracker",
+  "version": "1.0.0",
+  "description": "90-Day Gym Workout Tracker Application",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "build": "npm --prefix client run build",
+    "test": "npm --prefix server test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
