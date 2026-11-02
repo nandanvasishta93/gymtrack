@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: gym-tracker
+    runtime: node
+    plan: free
+    buildCommand: |
+      npm install &&
+      cd server && npm install && cd .. &&
+      cd client && npm install && npm run build && cd ..
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:./prod.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 5000
